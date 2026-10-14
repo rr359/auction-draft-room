@@ -1,0 +1,10 @@
+{
+  "name": "auction-draft-room",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fantasy basketball auction draft control center. Static app; no build step.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "serve": "python3 -m http.server 8000"
+  }
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Draft Room 2026-27</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%80%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css?v=2">
+</head>
+<body>
+<header id="top">
+  <div class="brand"><span class="logo">🏀</span><div><div class="title">Draft Room</div><div class="sub" id="leagueName"></div></div></div>
+  <div id="stats" class="stats"></div>
+</header>
+<nav id="tabs" class="tabs"></nav>
+<main>
+  <section class="view" id="v-draft">
+    <div class="draft-grid">
+      <div class="area-block" id="blockArea">
+        <div class="searchwrap">
+          <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="Who's on the block?  Type a name, press / to focus" aria-label="Search player to put on the block">
+          <div id="sugg" class="sugg" role="listbox"></div>
+        </div>
+        <div id="block"></div>
+      </div>
+      <aside class="area-adv" id="advisor"></aside>
+      <div class="area-board">
+        <div class="board-tools" id="boardTools"></div>
+        <div id="board"></div>
+      </div>
+    </div>
+  </section>
+  <section class="view" id="v-teams"></section>
+  <section class="view" id="v-mine"></section>
+  <section class="view" id="v-log"></section>
+  <section class="view" id="v-settings"></section>
+</main>
+<div id="modal" class="modal" hidden></div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="js/config.js?v=2"></script>
+<script src="js/players.js?v=2"></script>
+<script src="js/engine.js?v=2"></script>
+<script src="js/advisor.js?v=2"></script>
+<script src="js/app.js?v=2"></script>
+</body>
+</html>
