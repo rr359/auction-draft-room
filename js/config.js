@@ -6,8 +6,9 @@ var DEFAULTS = {
   scoring: '9-cat H2H (PTS REB AST STL BLK 3PM FG% FT% TO)',
   budget: 200,
   minBid: 1,
-  // 9 starters from Yahoo (PG SG G SF PF F C Util Util) + 4 bench = 13-man roster.
-  slots: ['PG', 'SG', 'G', 'SF', 'PF', 'F', 'C', 'UTIL', 'UTIL', 'BN', 'BN', 'BN', 'BN'],
+  // 9 starters from Yahoo (PG SG G SF PF F C Util Util) + 3 bench = 12 drafted players.
+  // The league also has 2 IL spots; they are not filled in the auction, so they are not listed here.
+  slots: ['PG', 'SG', 'G', 'SF', 'PF', 'F', 'C', 'UTIL', 'UTIL', 'BN', 'BN', 'BN'],
   teams: [
     'Franz A Make Her Dance',
     'Big Body Brunson’s Ball Playas',

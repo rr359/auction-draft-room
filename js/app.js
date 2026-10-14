@@ -13,6 +13,8 @@ function load() {
   try {
     var raw = JSON.parse(localStorage.getItem(LSKEY));
     var s = E.migrate(raw, DEFAULTS, PLAYERS);
+    // v1 of this app shipped with a 4-man bench; the league has 3 (+2 IL, not drafted).
+    if (s && s.settings.slots.join() === 'PG,SG,G,SF,PF,F,C,UTIL,UTIL,BN,BN,BN,BN') s.settings.slots = DEFAULTS.slots.slice();
     if (s) return s;
   } catch (e) { /* fall through */ }
   return E.freshState(DEFAULTS);

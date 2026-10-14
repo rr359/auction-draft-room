@@ -32,7 +32,7 @@ Keyboard: `/` search · `↑ ↓ Enter` choose · `Esc` clear · `1`–`5` switc
 
 ## League defaults
 
-14 teams · $200 · 13-man roster (PG, SG, G, SF, PF, F, C, UTIL, UTIL, BN×4) · 9-cat H2H. Change in **Settings**; prices rescale automatically. Positions in the sheet are G / F / C / G/F / F/C, so G fills PG/SG/G and F fills SF/PF/F.
+14 teams · $200 · 12 drafted players (PG, SG, G, SF, PF, F, C, UTIL, UTIL, BN×3) · 2 IL spots (not drafted) · 9-cat H2H. Change in **Settings**; prices rescale automatically from the 14 × $200 × 13 sheet. Positions in the sheet are G / F / C / G/F / F/C, so G fills PG/SG/G and F fills SF/PF/F.
 
 The player prices in `js/players.js` were carried over from the original sheet unchanged and have not been refreshed or fact-checked.
 

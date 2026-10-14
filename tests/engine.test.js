@@ -15,17 +15,18 @@ function stateWith(picks) {
 test('fresh draft: market equals the sheet and budgets are full', () => {
   const m = E.buildModel(stateWith([]), PLAYERS);
   assert.strictEqual(m.teams.length, 14);
-  assert.ok(Math.abs(m.row(1).market - 80) < 0.01, 'Jokic market ' + m.row(1).market);
+  assert.ok(m.row(1).market > 80 && m.row(1).market < 90, 'Jokic market ' + m.row(1).market);
   assert.ok(Math.abs(m.inflation - 1) < 1e-9);
-  assert.strictEqual(m.me.maxBid, 200 - 12);
+  assert.strictEqual(m.me.maxBid, 200 - 11);
+  assert.strictEqual(m.rosterSize, 12);
   assert.strictEqual(m.me.name, 'Franz A Make Her Dance');
 });
 
 test('budgets, max bid and open slots update with picks', () => {
   const m = E.buildModel(stateWith([[1, 0, 85], [2, 3, 70]]), PLAYERS);
   assert.strictEqual(m.me.left, 115);
-  assert.strictEqual(m.me.open, 12);
-  assert.strictEqual(m.me.maxBid, 115 - 11);
+  assert.strictEqual(m.me.open, 11);
+  assert.strictEqual(m.me.maxBid, 115 - 10);
   assert.strictEqual(m.teams[3].left, 130);
   assert.ok(m.row(1).taken);
 });
@@ -52,10 +53,10 @@ test('inflation rises when the room underspends', () => {
 });
 
 test('bid advice respects legal max and roster needs', () => {
-  // I spend 180 on one player: legal max is 20 - 11 = 9.
+  // I spend 180 on one player: legal max is 20 - 10 = 10.
   const m = E.buildModel(stateWith([[1, 0, 180]]), PLAYERS);
   const a = A.bidAdvice(m, m.state, m.row(5));
-  assert.ok(a.upTo <= 9, 'upTo ' + a.upTo);
+  assert.ok(a.upTo <= 10, 'upTo ' + a.upTo);
   // A second pure C is bench-only once the C slot and UTILs are full.
   const s = stateWith([[1, 0, 60], [15, 0, 30], [22, 0, 20]]);
   const m2 = E.buildModel(s, PLAYERS);
@@ -72,8 +73,10 @@ test('advise produces targets and nominations on a fresh board', () => {
   assert.ok(r.byNeed.length >= 7);
 });
 
-test('league rescaling: $100 budget halves prices roughly', () => {
+test('league rescaling: base 13-man sheet reproduces exactly; $100 budget halves prices roughly', () => {
   const s = stateWith([]);
+  s.settings.slots = DEFAULTS.slots.concat(['BN']);
+  assert.ok(Math.abs(E.buildModel(s, PLAYERS).row(1).market - 80) < 0.01);
   s.settings.budget = 100;
   const m = E.buildModel(s, PLAYERS);
   assert.ok(m.row(1).market > 35 && m.row(1).market < 42, 'market ' + m.row(1).market);
