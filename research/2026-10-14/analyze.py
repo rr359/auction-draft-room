@@ -117,9 +117,9 @@ bbV = {k: curve_at(r) for k, r in bbm.items()}
 # ---------- news (Yahoo/Titus, ESPN injuries, Athlon) ----------
 # (value multiplier, market multiplier, note, extra flags)
 NEWS = {
- 'kristaps porzingis': (0.35, 0.5, 'Out indefinitely (undisclosed health issue) per ESPN injury report.', ['injury']),
- 'jimmy butler': (0.5, 0.7, 'Knee; out until ~Jan 2 per ESPN.', ['injury']),
- 'mark williams': (0.6, 1.0, 'Torn labrum; out until at least February. Stash only.', ['injury']),
+ 'kristaps porzingis': (0.35, 0.5, 'Out indefinitely (undisclosed health issue) per ESPN injury report.', ['injury', 'out']),
+ 'jimmy butler': (0.5, 0.7, 'Knee; out until ~Jan 2 per ESPN.', ['injury', 'out']),
+ 'mark williams': (0.6, 1.0, 'Torn labrum; out until at least February. Stash only.', ['injury', 'out']),
  'brandon ingram': (0.9, 1.0, 'Partial Achilles tear; ESPN lists Nov 1 return. Hachimura starts meanwhile.', ['injury']),
  'nic claxton': (0.85, 1.0, 'Hamstring; re-evaluated Oct 19. Jalen Smith starting.', ['injury']),
  'jalen smith': (1.4, 1.2, 'Starting C while Claxton (hamstring) is out: 13 pts/8 reb in 20 min (Yahoo).', []),
@@ -142,7 +142,7 @@ NEWS = {
  'rui hachimura': (1.15, 1.0, 'Riser with Ingram out; ~20 ppg upside early.', []),
  'quentin grimes': (1.15, 1.0, 'Started all 3 preseason games for LAL.', []),
  'daniel gafford': (1.3, 1.1, 'Lively, Aldama, Morez Johnson all out — role grows by default (Titus sleeper).', []),
- 'dereck lively': (0.6, 1.0, 'Foot; still shelved.', ['injury']),
+ 'dereck lively': (0.6, 1.0, 'Foot; still shelved.', ['injury', 'out']),
  'khaman maluach': (1.15, 1.0, 'Out-minuting Ighodaro (21 vs 16 mpg); Mark Williams out to Feb.', []),
  'jeremiah fears': (1.15, 1.0, 'Starting for Dejounte Murray; 13.5 pts in 18 min, 50/50 shooting.', []),
  'dejounte murray': (0.9, 1.0, 'Toe; Fears started in his place.', ['injury']),
@@ -163,6 +163,11 @@ NEWS = {
  'walker kessler': (1.05, 1.0, 'Finger, not concerning (Titus). BBM 9-cat #12 last season. Athlon: pay $20-25 if he starts.', []),
 }
 
+# Players with a recent history of missing many games (per-game ranks overstate them).
+AVAIL_RISK = {norm(n) for n in ['Joel Embiid', 'Kawhi Leonard', 'Zion Williamson', 'Anthony Davis', 'Kyrie Irving', 'LeBron James',
+    'Paul George', 'Ja Morant', 'Jimmy Butler', 'Brandon Ingram', 'Kevin Porter Jr.', 'Tyrese Haliburton', 'Kristaps Porzingis',
+    'Bradley Beal', 'Jamal Murray', 'Dejounte Murray', 'Robert Williams III', 'Mitchell Robinson']}
+
 # ---------- compute ----------
 def wavg(pairs):
     pairs = [(v, w) for v, w in pairs if v is not None]
@@ -176,9 +181,13 @@ for p in sheet:
     mY, mE = yA.get(k), eA.get(k)
     vY, vE, vH, vB = yP.get(k), eP.get(k), ht.get(k), bbV.get(k)
     market = wavg([(old_exp, 0.30), (mY, 0.45), (mE, 0.25)])
-    value = wavg([(old_exp, 0.20), (vY, 0.25), (vE, 0.10), (vH, 0.25), (vB, 0.20)])
+    # BBM is per-game production; for players who miss lots of games it overstates season value.
+    bbm_w = 0.07 if k in AVAIL_RISK else 0.20
+    value = wavg([(old_exp, 0.20), (vY, 0.25), (vE, 0.10), (vH, 0.25), (vB, bbm_w)])
+    n_sources = sum(v is not None for v in (vY, vE, vH, vB))
     if market is None: market = old_exp or 1
-    if value is None: value = market
+    if value is None or n_sources < 2: value = market  # one source isn't enough to move a player off market
+    if k in AVAIL_RISK: value = min(value, market * 1.1)  # don't pay a premium for games he may not play
     vm, mm, news, nflags = NEWS.get(k, (1, 1, '', []))
     value *= vm; market *= mm
     flags = set(p['flags'])
@@ -188,7 +197,8 @@ for p in sheet:
     is_c = 'C' in p['pos'].split('/')
     riser = vm > 1.05
     long_out = k in ('jimmy butler', 'mark williams', 'kristaps porzingis', 'dereck lively')
-    if long_out: call = ''
+    if long_out or n_sources < 2: call = ''  # never tag a player on one source's say-so
+    elif k in AVAIL_RISK and sig > -0.15: call = ''  # injury-prone: fair at best, never a bargain/pay-up
     elif sig >= 0.15 and value - market >= 1.5: call = 'bargain'
     elif sig <= -0.15 and market - value >= 1.5: call = 'overpriced'
     elif sig >= -0.03 and (riser or 'blk' in flags or 'stl' in flags or (is_c and market >= 8)): call = 'payup'
@@ -205,6 +215,7 @@ for p in sheet:
     # Projection-only upside (e.g. last season's per-game rank) can't push a max far past what anyone pays.
     ce = min(ce, max(mk + 3, round(mk * 1.35)))
     if long_out: ce = mk  # stash at market, never chase
+    if k in AVAIL_RISK: ce = min(ce, max(mk, round(mk * 1.1)))
     rows.append(dict(p=p, k=k, old_exp=old_exp, old_ceil=old_ceil, exp=mk, ceil=ce, value=value, call=call, news=news, nflags=nflags,
                      src={'yAvg': yahoo.get(k, (None,))[0], 'eAvg': espn.get(k, (None,))[0], 'yProj': yahoo.get(k, (None, None))[1],
                           'eProj': espn.get(k, (None, None))[1], 'ht14': vH, 'bbm': bbm.get(k)}))

@@ -206,7 +206,7 @@ function buildModel(state, basePlayers) {
 /* ---------------- helpers ---------------- */
 
 function normalize(s) {
-  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’‘`]/g, "'").replace(/[^a-z0-9' ]/g, ' ').replace(/\s+/g, ' ').trim();
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’‘`']/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 /* Rank players for a typeahead query: prefix of full name or last name beats substring. */
 function searchPlayers(rows, q, limit) {

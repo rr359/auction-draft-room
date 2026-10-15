@@ -73,6 +73,7 @@ function sourcesLine(p) {
   if (s.bbm != null) parts.push('BBM 9-cat <b>#' + s.bbm + '</b>');
   return parts.length ? '<div class="srcline" title="Yahoo/ESPN averages come from 10-12 team rooms; this sheet rescales them to your 14-team league.">' + parts.join(' · ') + '</div>' : '';
 }
+function tagText(v) { return v === 'ENFORCE' ? 'PUSH' : v === 'CANT' ? "CAN'T" : v; }
 function verdictText(a) {
   switch (a.verdict) {
     case 'BID': return 'BID up to ' + $i(a.upTo);
@@ -189,7 +190,7 @@ function validateSale() {
   else if (!(price >= model.minBid)) { msg = 'Enter a price of at least $' + model.minBid + '.'; block = true; }
   else {
     var t = model.teams[ui.saleTeam];
-    var max = t.maxBid + (row.taken && row.pick.team === ui.saleTeam ? row.pick.price : 0);
+    var max = row.taken && row.pick.team === ui.saleTeam ? t.left + row.pick.price - t.open * model.minBid : t.maxBid;
     if (row.taken && row.pick.team !== ui.saleTeam && t.open <= 0) { msg = t.name + '\'s roster is full.'; block = true; }
     else if (price > max) { msg = 'That is over ' + t.name + '\'s max bid (' + $i(max) + '). Check Yahoo, then click again to log anyway.'; block = !ui.overrideOk; }
     else if (t.isMe && !row.taken) {
@@ -238,7 +239,7 @@ function renderSugg() {
     var a = advice.byId[String(r.id)];
     return '<div class="it' + (i === ui.suggIdx ? ' sel' : '') + (r.taken ? ' taken' : '') + '" data-sugg="' + r.id + '"><div class="nm"><b>' + esc(r.p.name) + '</b>' + badges(r.p) +
       '<div class="small">' + esc(r.p.pos) + ' · ' + esc(r.p.team) + ' · T' + r.p.tier + (r.taken ? ' · sold ' + $n(r.pick.price) + ' to ' + esc(teamName(r.pick.team)) : '') + '</div></div>' +
-      (r.taken ? '' : '<div class="r num">' + $i(r.market) + ' <span class="small">/ ' + $f(r.ceil) + '</span></div>' + (a ? '<span class="verdict-tag vt-' + a.verdict + '">' + a.verdict + '</span>' : '')) + '</div>';
+      (r.taken ? '' : '<div class="r num">' + $i(r.market) + ' <span class="small">/ ' + $f(r.ceil) + '</span></div>' + (a ? '<span class="verdict-tag vt-' + a.verdict + '">' + tagText(a.verdict) + '</span>' : '')) + '</div>';
   }).join('');
   if (q.length >= 3) h += '<div class="it' + (ui.suggIdx === list.length ? ' sel' : '') + '" data-addcustom="1"><div class="nm">+ Add “' + esc(q) + '” as an unlisted player</div></div>';
   el.innerHTML = h;
@@ -269,7 +270,7 @@ function renderAdvisor() {
     if (adv.byNeed.length) {
       h += '<details class="card"' + (adv.phase !== 'early' ? ' open' : '') + '><summary><h2>Options by open slot</h2></summary>' + adv.byNeed.map(function (n) {
         return '<div style="margin-top:8px"><b>' + n.slot + '</b><div class="alist">' + n.options.slice(0, 3).map(function (x) {
-          return '<div class="row" data-block="' + x.r.id + '"><div class="nm">' + esc(x.r.p.name) + '<span class="s">T' + x.r.p.tier + ' · ' + esc(x.r.p.pos) + '</span></div><div class="pr">' + $i(x.a.market) + '<span class="s"><span class="verdict-tag vt-' + x.a.verdict + '">' + x.a.verdict + '</span> ' + (x.a.upTo ? $i(x.a.upTo) : '') + '</span></div></div>';
+          return '<div class="row" data-block="' + x.r.id + '"><div class="nm">' + esc(x.r.p.name) + '<span class="s">T' + x.r.p.tier + ' · ' + esc(x.r.p.pos) + '</span></div><div class="pr">' + $i(x.a.market) + '<span class="s"><span class="verdict-tag vt-' + x.a.verdict + '">' + tagText(x.a.verdict) + '</span> ' + (x.a.upTo ? $i(x.a.upTo) : '') + '</span></div></div>';
         }).join('') + '</div></div>';
       }).join('') + '</details>';
     }
@@ -311,7 +312,7 @@ function renderBoardTools() {
   el.innerHTML = '<input id="bq" type="search" placeholder="Filter board…" aria-label="Filter board">' +
     seg('bStatus', [['avail', 'Available'], ['all', 'All'], ['taken', 'Sold']]) +
     seg('bPos', [['all', 'All'], ['G', 'G'], ['F', 'F'], ['C', 'C']]) +
-    seg('bFlag', [['all', 'Any'], ['need', 'Fills need'], ['bid', 'BID calls'], ['bargain', 'Bargains'], ['payup', 'Pay up'], ['overpriced', 'Overpriced'], ['punt', 'Punt fit'], ['injury', 'Injured']]);
+    seg('bFlag', [['all', 'Any'], ['need', 'Fills need'], ['bid', 'BID calls'], ['push', 'PUSH calls'], ['bargain', 'Bargains'], ['payup', 'Pay up'], ['overpriced', 'Overpriced'], ['punt', 'Punt fit'], ['injury', 'Injured']]);
   el.dataset.built = '1';
 }
 function boardRows() {
@@ -323,6 +324,7 @@ function boardRows() {
     var a = advice.byId[String(r.id)];
     if (ui.bFlag === 'need' && !(a && a.slot)) return false;
     if (ui.bFlag === 'bid' && !(a && a.verdict === 'BID')) return false;
+    if (ui.bFlag === 'push' && !(a && a.verdict === 'ENFORCE')) return false;
     if ((ui.bFlag === 'bargain' || ui.bFlag === 'payup' || ui.bFlag === 'overpriced') && r.p.call !== ui.bFlag) return false;
     if (ui.bFlag === 'punt' && !(state.punt !== 'none' && has(r.p, state.punt))) return false;
     if (ui.bFlag === 'injury' && !has(r.p, 'injury')) return false;
@@ -355,7 +357,7 @@ function renderBoard() {
     var mine = r.taken && r.pick.team === state.myTeam;
     var status = r.taken
       ? '<b>' + $n(r.pick.price) + '</b> <span class="ps">' + esc(teamName(r.pick.team)) + '</span>'
-      : (a ? '<span class="verdict-tag vt-' + a.verdict + '">' + a.verdict + '</span>' + (a.slot ? ' <span class="ps">' + a.slot + '</span>' : '') : '');
+      : (a ? '<span class="verdict-tag vt-' + a.verdict + '">' + tagText(a.verdict) + '</span>' + (a.slot ? ' <span class="ps">' + a.slot + '</span>' : '') : '');
     var edge = a && !r.taken ? a.upTo - a.market : null;
     return '<tr data-block="' + r.id + '" class="' + (r.taken ? 'taken' : '') + (mine ? ' mine' : '') + (String(ui.blockId) === String(r.id) ? ' onblock' : '') + '">' +
       '<td class="r dim num">' + p.rank + '</td>' +

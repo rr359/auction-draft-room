@@ -39,10 +39,18 @@ function suggestPunt(prof) {
 }
 
 /* Who else can (and wants to) pay for this player? */
+/* starterSlotFor is called for every (team, player) pair on each render; cache per model by team + position. */
+function slotFor(m, team, pos) {
+  var c = m._slotCache || (m._slotCache = {});
+  var k = team.idx + '|' + pos;
+  if (!(k in c)) c[k] = E.starterSlotFor(team.entries, m.slots, pos);
+  return c[k];
+}
+
 function rivalsFor(m, row) {
   return m.teams.filter(function (t) { return !t.isMe && t.open > 0 && t.maxBid >= Math.max(m.minBid, Math.round(row.market)); })
     .map(function (t) {
-      return { team: t, needs: !!E.starterSlotFor(t.entries, m.slots, row.p.pos) };
+      return { team: t, needs: !!slotFor(m, t, row.p.pos) };
     })
     .sort(function (a, b) { return (b.needs - a.needs) || (b.team.maxBid - a.team.maxBid); });
 }
@@ -66,7 +74,7 @@ function bidAdvice(m, state, row) {
   out.legalMax = legalMax;
   if (legalMax < m.minBid) { out.verdict = 'CANT'; out.reasons.push('No dollars above your $' + m.minBid + '-per-slot reserve.'); return out; }
 
-  var slot = E.starterSlotFor(me.entries, m.slots, p.pos);
+  var slot = slotFor(m, me, p.pos);
   out.slot = slot;
   var startersOpen = me.openStarters.length;
   var adj = row.ceil, pct = 0;
@@ -94,11 +102,13 @@ function bidAdvice(m, state, row) {
     out.cautions.push('FT% drag' + (punt === 'none' ? ' — buying him leans you toward punting FT.' : ' — fights your ' + PUNT_LABEL[punt] + ' build.'));
   }
   if (has(p, 'to') && punt !== 'to' && punt !== 'none') { pct -= 0.04; out.cautions.push('High turnovers.'); }
-  if (has(p, 'blk') || has(p, 'stl')) { pct += 0.04; out.reasons.push('Scarce ' + (has(p, 'blk') && has(p, 'stl') ? 'STL+BLK' : has(p, 'blk') ? 'BLK' : 'STL') + ' source.'); }
+  if ((has(p, 'blk') || has(p, 'stl')) && p.call !== 'payup') { pct += 0.04; out.reasons.push('Scarce ' + (has(p, 'blk') && has(p, 'stl') ? 'STL+BLK' : has(p, 'blk') ? 'BLK' : 'STL') + ' source.'); }
   if (p.call === 'bargain') out.reasons.push('Bargain: rooms usually pay less than his value — buy at market.');
   if (p.call === 'payup') out.reasons.push('Worth going a bit over market (scarce stats / rising role).');
   if (p.call === 'overpriced') out.cautions.push('Overpriced: rooms usually pay more than his 9-cat value — let someone else.');
-  if (has(p, 'injury')) out.cautions.push('Injury/availability risk (already priced into ceiling).');
+  var outLong = has(p, 'out');
+  if (outLong) out.cautions.push('Out long-term — bench stash only, never a starter.');
+  else if (has(p, 'injury')) out.cautions.push('Injury/availability risk (already priced into ceiling).');
 
   // Ceilings are your number: upward nudges are capped at +6%, cuts are not.
   adj = adj * (1 + Math.min(pct, MAX_BUMP));
@@ -106,10 +116,11 @@ function bidAdvice(m, state, row) {
   // Budget discipline.
   var startersAfter = Math.max(0, startersOpen - (slot ? 1 : 0));
   var softMax = legalMax - 2 * Math.max(0, startersAfter - 1);
-  var topPrice = me.entries.reduce(function (a, e) { return Math.max(a, e.price); }, 0);
-  var topTwoCap = me.count >= 1 ? flr(TOP_TWO_CAP * m.settings.budget - topPrice) : Infinity;
+  // Top-two cap: if this buy would become one of your two biggest, keep the pair under 70% of budget.
+  var prices = me.entries.map(function (e) { return e.price; }).sort(function (a, b) { return b - a; });
+  var topTwoCap = prices.length ? Math.max(flr(TOP_TWO_CAP * m.settings.budget - prices[0]), prices[1] || 0) : Infinity;
   if (topTwoCap < adj && topTwoCap < softMax) out.cautions.push('Top-two cap: keeps your two biggest buys under $' + flr(TOP_TWO_CAP * m.settings.budget) + '.');
-  var upTo = flr(Math.min(adj, legalMax, softMax, me.count === 1 ? topTwoCap : Infinity));
+  var upTo = flr(Math.min(adj, legalMax, softMax, topTwoCap));
   upTo = Math.max(0, upTo);
   out.upTo = upTo;
 
@@ -122,6 +133,11 @@ function bidAdvice(m, state, row) {
   out.rivals = rivals;
   var needRivals = rivals.filter(function (r) { return r.needs; }).length;
 
+  if (outLong && startersAfter + (slot ? 1 : 0) > 0) { // only once your starters are set
+    out.verdict = 'PASS'; out.upTo = 0;
+    out.reasons = out.reasons.filter(function (r) { return !/^Fills your open/.test(r); });
+    return out;
+  }
   if (upTo < m.minBid) { out.verdict = 'CANT'; out.upTo = 0; return out; }
   var tight = Math.max(1, Math.round(mkt * 0.08));
   if (upTo >= mkt) out.verdict = 'BID';
@@ -138,7 +154,7 @@ function bidAdvice(m, state, row) {
 
 /* Cheaper players at the same spot, for when the bidding runs past your number. */
 function alternatives(m, state, row, n) {
-  var slot = E.starterSlotFor(m.me.entries, m.slots, row.p.pos);
+  var slot = slotFor(m, m.me, row.p.pos);
   return m.available.filter(function (r) {
     return r.id !== row.id && (slot ? E.canPlay(r.p.pos, slot) : r.p.pos === row.p.pos) && r.market <= row.market * 1.1 && r.market >= Math.min(row.market * 0.4, row.market - 3);
   }).map(function (r) { return { r: r, a: bidAdvice(m, state, r) }; })
