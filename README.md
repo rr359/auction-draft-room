@@ -13,7 +13,7 @@ Or just open `index.html` in a browser — no build step, no server, no dependen
 
 | Tab | What it's for |
 |---|---|
-| **Draft** | Search/block panel, full player board (filters: available/sold, position, fills-my-need, BID calls, values, punt fits, risks), advisor sidebar, room money table |
+| **Draft** | Search/block panel, full player board (filters: available/sold, position, fills-my-need, BID calls, bargains, pay up, overpriced, punt fits, injured), advisor sidebar, room money table |
 | **Teams & Money** | Every team's $ left, max bid, roster count, $/open slot, open starting slots, value vs paid. Click a team to see its roster. |
 | **My Team** | Budget, roster slots, purchases, category direction (punt FT% / TO / AST), price templates |
 | **Log** | Every pick in order. Edit, undo, download/copy a JSON backup, import, CSV export |
@@ -25,6 +25,9 @@ Keyboard: `/` search · `↑ ↓ Enter` choose · `Esc` clear · `1`–`5` switc
 
 ## How the numbers work
 
+- **Value calls** — every player is tagged from a cross-check of Yahoo and ESPN auction results, Hashtag Basketball, Basketball Monster and preseason news (see [docs/price-review-2026-10-14.md](docs/price-review-2026-10-14.md)):
+  **BARGAIN** (rooms usually pay less than he's worth — buy), **PAY UP** (worth going a bit over market), **OVERPRICED** (rooms overpay — push the price and let a rival have him). Each player's card shows the raw source numbers.
+- **Nominate next** — **Make rivals pay**: put up players you don't want (ideally OVERPRICED ones) so rivals spend before your targets come up. **Sneak in**: put up a player you want when few rivals can outbid you.
 - **Market** — the sheet's expected price × live inflation. Inflation = (money left in the room − $1 per open roster spot) ÷ (sheet value of the best remaining players who will fill those spots). If the room underspends early, prices rise.
 - **Ceiling** — the price sheet's max for the player. It does **not** inflate.
 - **Your max** — the advisor's number for *you*: the ceiling, adjusted for roster fit (bench-only buys capped at 75% of market), position scarcity, punt fit, STL/BLK value, FT% drag, and budget rules (legal max, a reserve for remaining starters, and a cap of 70% of budget on your top two players). Upward nudges are capped at +6%.
@@ -34,7 +37,7 @@ Keyboard: `/` search · `↑ ↓ Enter` choose · `Esc` clear · `1`–`5` switc
 
 14 teams · $200 · 12 drafted players (PG, SG, G, SF, PF, F, C, UTIL, UTIL, BN×3) · 2 IL spots (not drafted) · 9-cat H2H. Change in **Settings**; prices rescale automatically from the 14 × $200 × 13 sheet. Positions in the sheet are G / F / C / G/F / F/C, so G fills PG/SG/G and F fills SF/PF/F.
 
-The player prices in `js/players.js` were carried over from the original sheet unchanged and have not been refreshed or fact-checked.
+Player prices were re-checked on 2026-10-14 against Yahoo and ESPN auction results, Hashtag Basketball, Basketball Monster and preseason injury/role news. What changed and why: [docs/price-review-2026-10-14.md](docs/price-review-2026-10-14.md).
 
 ## For developers and agents
 

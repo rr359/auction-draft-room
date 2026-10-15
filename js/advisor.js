@@ -23,9 +23,10 @@ function phaseOf(m) {
 function profile(team) {
   var c = { ft: 0, to: 0, ast: 0, blk: 0, stl: 0, injury: 0, bust: 0, names: {} };
   team.entries.forEach(function (e) {
-    ['ft', 'to', 'ast', 'blk', 'stl', 'injury', 'bust'].forEach(function (f) {
+    ['ft', 'to', 'ast', 'blk', 'stl', 'injury'].forEach(function (f) {
       if (has(e.player, f)) { c[f]++; (c.names[f] = c.names[f] || []).push(e.player.name); }
     });
+    if (e.player.call === 'overpriced') { c.bust++; (c.names.bust = c.names.bust || []).push(e.player.name); }
   });
   return c;
 }
@@ -94,8 +95,9 @@ function bidAdvice(m, state, row) {
   }
   if (has(p, 'to') && punt !== 'to' && punt !== 'none') { pct -= 0.04; out.cautions.push('High turnovers.'); }
   if (has(p, 'blk') || has(p, 'stl')) { pct += 0.04; out.reasons.push('Scarce ' + (has(p, 'blk') && has(p, 'stl') ? 'STL+BLK' : has(p, 'blk') ? 'BLK' : 'STL') + ' source.'); }
-  if (has(p, 'sleeper')) out.reasons.push('Panel value pick.');
-  if (has(p, 'bust')) out.cautions.push('Panel says overpriced — hold your ceiling.');
+  if (p.call === 'bargain') out.reasons.push('Bargain: rooms usually pay less than his value — buy at market.');
+  if (p.call === 'payup') out.reasons.push('Worth going a bit over market (scarce stats / rising role).');
+  if (p.call === 'overpriced') out.cautions.push('Overpriced: rooms usually pay more than his 9-cat value — let someone else.');
   if (has(p, 'injury')) out.cautions.push('Injury/availability risk (already priced into ceiling).');
 
   // Ceilings are your number: upward nudges are capped at +6%, cuts are not.
@@ -175,15 +177,15 @@ function advise(m, state) {
     all.filter(function (x) {
       if (x.a.market < 12 * m.scale || topIds.indexOf(x.r.id) >= 0) return false;
       if (phase === 'late') return x.a.market > me.maxBid; // late: only players you couldn't buy anyway
-      return x.a.verdict !== 'BID' || x.a.upTo - x.a.market <= 1 || has(x.r.p, 'bust');
+      return x.a.verdict !== 'BID' || x.a.upTo - x.a.market <= 1 || x.r.p.call === 'overpriced';
     })
       .map(function (x) {
         var why = x.a.market > me.maxBid ? 'You can\'t afford him — make rivals spend before your targets come up.'
-          : has(x.r.p, 'bust') ? 'Panel says overpriced — let a rival overpay.'
+          : x.r.p.call === 'overpriced' ? 'Overpriced — someone will overpay; let it be a rival.'
           : has(x.r.p, 'injury') ? 'Injury risk — someone will still pay up.'
-          : !x.a.slot && me.openStarters.length ? 'You don\'t need the position — drains rival cash.'
-          : 'Not worth market to you — drains $' + x.a.market + ' from the room.';
-        return { r: x.r, a: x.a, why: why, kind: 'drain', score: x.a.market * (1 + rivalsAfford(x.a.market) / 13) };
+          : !x.a.slot && me.openStarters.length ? 'You don\'t need the position — takes ~$' + x.a.market + ' out of a rival\'s budget.'
+          : 'Not worth market to you — takes ~$' + x.a.market + ' out of a rival\'s budget.';
+        return { r: x.r, a: x.a, why: why, kind: 'rivalspay', score: x.a.market * (1 + rivalsAfford(x.a.market) / 13) * (x.r.p.call === 'overpriced' ? 1.3 : 1) };
       }).sort(function (a, b) { return b.score - a.score; }).slice(0, 4).forEach(function (n) { noms.push(n); });
   }
   // Snipes: players you want that few rivals can outbid.
@@ -193,7 +195,7 @@ function advise(m, state) {
   }).filter(function (x) { return x.n <= (phase === 'late' ? 2 : 0); })
     .sort(function (a, b) { return (b.a.upTo - b.a.market) - (a.a.upTo - a.a.market) || b.a.market - a.a.market; })
     .slice(0, 3).forEach(function (x) {
-      noms.push({ r: x.r, a: x.a, kind: 'snipe', why: x.n === 0 ? 'Nobody can outbid your $' + x.a.upTo + '.' : 'Only ' + x.n + ' team' + (x.n === 1 ? '' : 's') + ' can top your $' + x.a.upTo + '.' });
+      noms.push({ r: x.r, a: x.a, kind: 'sneak', why: x.n === 0 ? 'Nobody can outbid your $' + x.a.upTo + '.' : 'Only ' + x.n + ' team' + (x.n === 1 ? '' : 's') + ' can top your $' + x.a.upTo + '.' });
     });
 
   // Endgame: cheap starters/values.
@@ -228,8 +230,8 @@ function advise(m, state) {
   }
   var roomPerSlot = m.openSpots > 0 ? m.moneyLeft / m.openSpots : 0;
   if (me.open > 0 && m.picksMade >= 10) {
-    if (me.perSlot < roomPerSlot * 0.7) alerts.push({ lvl: 'warn', msg: 'You are cash-light: $' + me.perSlot.toFixed(1) + '/slot vs room $' + roomPerSlot.toFixed(1) + '. Target value, skip bidding wars.' });
-    else if (me.perSlot > roomPerSlot * 1.4) alerts.push({ lvl: 'info', msg: 'You are cash-rich: $' + me.perSlot.toFixed(1) + '/slot vs room $' + roomPerSlot.toFixed(1) + '. Spend it — unspent money is wasted.' });
+    if (me.perSlot < roomPerSlot * 0.7) alerts.push({ lvl: 'warn', msg: 'You are cash-light: $' + Math.round(me.perSlot) + '/slot vs room $' + Math.round(roomPerSlot) + '. Target value, skip bidding wars.' });
+    else if (me.perSlot > roomPerSlot * 1.4) alerts.push({ lvl: 'info', msg: 'You are cash-rich: $' + Math.round(me.perSlot) + '/slot vs room $' + Math.round(roomPerSlot) + '. Spend it — unspent money is wasted.' });
   }
   var sug = suggestPunt(prof);
   if (state.punt === 'none' && sug) alerts.push({ lvl: 'info', msg: 'You own ' + prof[sug] + ' ' + { ft: 'FT% drags', to: 'high-TO players', ast: 'low-assist bigs' }[sug] + ' (' + prof.names[sug].join(', ') + '). Consider committing to ' + PUNT_LABEL[sug] + ' (My Team tab).' });

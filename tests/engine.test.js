@@ -57,11 +57,23 @@ test('bid advice respects legal max and roster needs', () => {
   const m = E.buildModel(stateWith([[1, 0, 180]]), PLAYERS);
   const a = A.bidAdvice(m, m.state, m.row(5));
   assert.ok(a.upTo <= 10, 'upTo ' + a.upTo);
-  // A second pure C is bench-only once the C slot and UTILs are full.
-  const s = stateWith([[1, 0, 60], [15, 0, 30], [22, 0, 20]]);
+  // A fourth pure C (Clingan) is bench-only once C and both UTILs hold Jokic, Wembanyama, Kessler.
+  const s = stateWith([[1, 0, 60], [2, 0, 50], [39, 0, 20]]);
   const m2 = E.buildModel(s, PLAYERS);
-  const adv = A.bidAdvice(m2, s, m2.row(35));
+  assert.strictEqual(m2.row(50).p.pos, 'C');
+  const adv = A.bidAdvice(m2, s, m2.row(50));
   assert.strictEqual(adv.slot, null);
+});
+
+test('every player has a valid price, ceiling and call', () => {
+  for (const p of PLAYERS) {
+    assert.ok(Number.isInteger(p.exp) && p.exp >= 1, p.name + ' exp');
+    assert.ok(Number.isInteger(p.ceil) && p.ceil >= 1, p.name + ' ceil');
+    assert.ok(['', 'bargain', 'payup', 'overpriced'].includes(p.call), p.name + ' call');
+    if (p.call === 'overpriced') assert.ok(p.ceil < p.exp || p.exp === 1, p.name + ' overpriced ceiling should sit below market');
+    if (p.call === 'bargain' || p.call === 'payup') assert.ok(p.ceil > p.exp, p.name + ' ceiling should sit above market');
+  }
+  assert.strictEqual(new Set(PLAYERS.map(p => p.id)).size, PLAYERS.length, 'ids unique');
 });
 
 test('advise produces targets and nominations on a fresh board', () => {

@@ -15,6 +15,7 @@ A static, dependency-free web app. No bundler, no framework, no npm install. Pla
 | `js/app.js` | All UI: rendering, events, persistence (localStorage key `draftRoom.state.v2`), undo stack, import/export. |
 | `tests/engine.test.js` | `node --test` suite for engine + advisor. Run `npm test`. |
 | `legacy/` | The original single-file app and its source, kept for reference only. Not loaded. |
+| `research/`, `docs/` | Price-review inputs, script and the human-readable changelog. Not loaded by the app. |
 
 ## State shape (localStorage `draftRoom.state.v2`, also the backup/export format)
 
@@ -40,7 +41,9 @@ A static, dependency-free web app. No bundler, no framework, no npm install. Pla
 
 ## Updating player data
 
-Edit `js/players.js` in place (one JSON object per line). Keep `id` stable for players that might already be in someone's saved picks. `exp`/`ceil` are in baseline-league dollars. Run `npm test` afterwards.
+Edit `js/players.js` in place (one JSON object per line). Keep `id` stable for players that might already be in someone's saved picks. `exp`/`ceil` are whole dollars in baseline-league terms (14 teams × $200 × 13). `call` is `bargain` | `payup` | `overpriced` | `''`; `src` holds the raw source numbers shown on the player card. Run `npm test` afterwards (it checks every player's price/ceiling/call is consistent).
+
+A full re-price is reproducible: `research/2026-10-14/` holds the scraped source data, the pre-review sheet and `analyze.py` (method and weights are in its docstring and in `docs/price-review-2026-10-14.md`). For a new review, copy that folder to a new date, refresh the `.txt` inputs, run it, review `report.json`, then copy `players.new.js` over `js/players.js`.
 
 ## Checking changes
 

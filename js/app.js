@@ -46,7 +46,7 @@ var ui = {
 function $(s, el) { return (el || document).querySelector(s); }
 function $$(s, el) { return Array.prototype.slice.call((el || document).querySelectorAll(s)); }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-function $n(v) { var r = Math.round(v * 10) / 10, a = Math.abs(r); return (r < 0 ? '-$' : '$') + (Number.isInteger(a) ? a : a.toFixed(1)); }
+function $n(v) { var r = Math.round(v); return (r < 0 ? '-$' : '$') + Math.abs(r); } // whole dollars only
 function $i(v) { var r = Math.round(v); return (r < 0 ? '-$' : '$') + Math.abs(r); }
 function $f(v) { return '$' + Math.floor(v + 1e-9); }
 function teamName(i) { return state.teams[i] ? state.teams[i].name : '?'; }
@@ -54,14 +54,24 @@ function has(p, f) { return (p.flags || []).indexOf(f) >= 0; }
 
 function badges(p) {
   var b = '';
-  if (has(p, 'sleeper')) b += '<span class="badge b-val" title="Panel value pick">VAL</span>';
-  if (has(p, 'bust')) b += '<span class="badge b-risk" title="Panel says overpriced">RISK</span>';
+  if (p.call === 'bargain') b += '<span class="badge b-val" title="Rooms usually pay less than his value">BARGAIN</span>';
+  if (p.call === 'payup') b += '<span class="badge b-pay" title="Worth going a bit over market">PAY UP</span>';
+  if (p.call === 'overpriced') b += '<span class="badge b-risk" title="Rooms usually pay more than his 9-cat value">OVERPRICED</span>';
   if (has(p, 'injury')) b += '<span class="badge b-inj" title="Injury / availability">INJ</span>';
   if (state.punt !== 'none' && has(p, state.punt)) b += '<span class="badge b-punt" title="Fits your punt">' + state.punt.toUpperCase() + '</span>';
   if (has(p, 'stl')) b += '<span class="badge b-cat" title="Steals asset">STL</span>';
   if (has(p, 'blk')) b += '<span class="badge b-cat" title="Blocks asset">BLK</span>';
   if (has(p, 'ft') && state.punt !== 'ft') b += '<span class="badge b-inj" title="FT% drag">FT-</span>';
   return b;
+}
+function sourcesLine(p) {
+  var s = p.src || {}, parts = [];
+  if (s.yAvg != null) parts.push('Yahoo avg paid <b>$' + Math.round(s.yAvg) + '</b>');
+  if (s.eAvg != null) parts.push('ESPN avg paid <b>$' + Math.round(s.eAvg) + '</b>');
+  if (s.ht14 != null) parts.push('Hashtag (14-team) <b>$' + Math.round(s.ht14) + '</b>');
+  if (s.yProj != null) parts.push('Yahoo proj <b>$' + Math.round(s.yProj) + '</b>');
+  if (s.bbm != null) parts.push('BBM 9-cat <b>#' + s.bbm + '</b>');
+  return parts.length ? '<div class="srcline" title="Yahoo/ESPN averages come from 10-12 team rooms; this sheet rescales them to your 14-team league.">' + parts.join(' · ') + '</div>' : '';
 }
 function verdictText(a) {
   switch (a.verdict) {
@@ -101,7 +111,7 @@ function renderHeader() {
     stat($n(me.left), 'My $ left', 'me') +
     stat($n(me.maxBid), 'My max bid', 'hi', 'Money left minus $' + model.minBid + ' for every other open slot') +
     stat(me.count + '/' + model.rosterSize, 'Roster') +
-    stat('$' + (me.open ? (me.left / me.open).toFixed(1) : '0') + ' <span class="dim" style="font-size:12px">/ $' + roomPer.toFixed(1) + '</span>', 'Me / room per slot') +
+    stat($n(me.open ? me.left / me.open : 0) + ' <span class="dim" style="font-size:12px">/ ' + $n(roomPer) + '</span>', 'Me / room per slot') +
     stat(model.inflation.toFixed(2) + 'x', 'Inflation', model.inflation > 1.05 ? 'hi' : '', 'Money left in the room vs. sheet value left. >1 = prices will run hot.') +
     stat(model.picksMade + '/' + model.totalSpots, 'Picks');
 }
@@ -135,7 +145,7 @@ function renderBlock() {
   var h = '<div class="blockcard"><div class="head"><div><h3>' + esc(p.name) + badges(p) + '</h3>' +
     '<div class="meta">#' + p.rank + ' · ' + esc(p.pos) + ' · ' + esc(p.team) + ' · Tier ' + p.tier + (row.taken ? ' · <b class="gold">sold to ' + esc(teamName(row.pick.team)) + ' for ' + $n(row.pick.price) + '</b>' : '') + '</div></div>' +
     '<button class="x" id="blockClose" title="Clear (Esc)">×</button></div>' +
-    (p.note ? '<div class="note">' + esc(p.note) + '</div>' : '');
+    (p.note ? '<div class="note">' + esc(p.note) + '</div>' : '') + sourcesLine(p);
 
   if (!row.taken) {
     h += '<div class="nums">' +
@@ -144,7 +154,7 @@ function renderBlock() {
       '<div class="cell key"><div class="v">' + (a.upTo ? $i(a.upTo) : '—') + '</div><div class="k">Your max</div></div>' +
       '<div class="cell"><div class="v">' + $i(me.maxBid) + '</div><div class="k">Legal max</div></div></div>';
     h += '<div class="verdict v-' + a.verdict + '">' + verdictText(a) +
-      (a.verdict === 'BID' && a.leftAfter != null ? '<span class="sub">→ leaves ' + $i(a.leftAfter) + ' for ' + (me.open - 1) + ' slots (~$' + a.perSlotAfter.toFixed(1) + '/slot)</span>' : '') + '</div>';
+      (a.verdict === 'BID' && a.leftAfter != null ? '<span class="sub">→ leaves ' + $i(a.leftAfter) + ' for ' + (me.open - 1) + ' slots (~' + $n(a.perSlotAfter) + '/slot)</span>' : '') + '</div>';
     if (a.reasons.length || a.cautions.length) h += '<ul class="why">' + a.reasons.map(function (r) { return '<li class="pro">' + esc(r) + '</li>'; }).join('') + a.cautions.map(function (r) { return '<li class="con">' + esc(r) + '</li>'; }).join('') + '</ul>';
     if (a.rivals) {
       var need = a.rivals.filter(function (r) { return r.needs; });
@@ -253,7 +263,7 @@ function renderAdvisor() {
     }).join('') || '<div class="small">Nothing on the board beats market for you right now.</div>') + '</div></div>';
 
     h += '<div class="card"><h2>Nominate next</h2><div class="alist">' + (adv.nominations.map(function (n) {
-      return '<div class="row" data-block="' + n.r.id + '"><div class="nm">' + esc(n.r.p.name) + ' <span class="badge ' + (n.kind === 'snipe' ? 'b-val">SNIPE' : 'b-risk">DRAIN') + '</span><span class="s">' + esc(n.why) + '</span></div><div class="pr">' + $i(n.a.market) + '</div></div>';
+      return '<div class="row" data-block="' + n.r.id + '"><div class="nm">' + esc(n.r.p.name) + ' <span class="badge ' + (n.kind === 'sneak' ? 'b-val">SNEAK IN' : 'b-risk">MAKE RIVALS PAY') + '</span><span class="s">' + esc(n.why) + '</span></div><div class="pr">' + $i(n.a.market) + '</div></div>';
     }).join('') || '<div class="small">No strong nomination plays — toss out a $1 player you like.</div>') + '</div></div>';
 
     if (adv.byNeed.length) {
@@ -301,7 +311,7 @@ function renderBoardTools() {
   el.innerHTML = '<input id="bq" type="search" placeholder="Filter board…" aria-label="Filter board">' +
     seg('bStatus', [['avail', 'Available'], ['all', 'All'], ['taken', 'Sold']]) +
     seg('bPos', [['all', 'All'], ['G', 'G'], ['F', 'F'], ['C', 'C']]) +
-    seg('bFlag', [['all', 'Any'], ['need', 'Fills need'], ['bid', 'BID calls'], ['sleeper', 'Values'], ['punt', 'Punt fit'], ['risk', 'Risk/INJ']]);
+    seg('bFlag', [['all', 'Any'], ['need', 'Fills need'], ['bid', 'BID calls'], ['bargain', 'Bargains'], ['payup', 'Pay up'], ['overpriced', 'Overpriced'], ['punt', 'Punt fit'], ['injury', 'Injured']]);
   el.dataset.built = '1';
 }
 function boardRows() {
@@ -309,13 +319,13 @@ function boardRows() {
   var rows = model.players.filter(function (r) {
     if (ui.bStatus === 'avail' && r.taken) return false;
     if (ui.bStatus === 'taken' && !r.taken) return false;
-    if (ui.bPos !== 'all' && r.p.pos.split('/').indexOf(ui.bPos) < 0) return false;
+    if (ui.bPos !== 'all' && !r.p.pos.split('/').some(function (x) { return x.indexOf(ui.bPos) >= 0; })) return false;
     var a = advice.byId[String(r.id)];
     if (ui.bFlag === 'need' && !(a && a.slot)) return false;
     if (ui.bFlag === 'bid' && !(a && a.verdict === 'BID')) return false;
-    if (ui.bFlag === 'sleeper' && !has(r.p, 'sleeper')) return false;
+    if ((ui.bFlag === 'bargain' || ui.bFlag === 'payup' || ui.bFlag === 'overpriced') && r.p.call !== ui.bFlag) return false;
     if (ui.bFlag === 'punt' && !(state.punt !== 'none' && has(r.p, state.punt))) return false;
-    if (ui.bFlag === 'risk' && !(has(r.p, 'bust') || has(r.p, 'injury'))) return false;
+    if (ui.bFlag === 'injury' && !has(r.p, 'injury')) return false;
     if (q && E.normalize(r.p.name + ' ' + r.p.team).indexOf(q) < 0) return false;
     return true;
   });
@@ -371,7 +381,7 @@ function renderTeams() {
   var h = '<div class="card"><h2>Room</h2><div class="kv"><span>Money left in room</span><b>' + $n(model.moneyLeft) + ' of ' + $n(model.pool) + '</b></div>' +
     '<div class="kv"><span>Open roster spots</span><b>' + model.openSpots + '</b></div>' +
     '<div class="kv"><span>Average $ per open spot</span><b>' + $n(advice.roomPerSlot) + '</b></div>' +
-    '<div class="kv"><span>Inflation</span><b>' + model.inflation.toFixed(3) + 'x</b></div></div>';
+    '<div class="kv"><span>Inflation</span><b>' + model.inflation.toFixed(2) + 'x</b></div></div>';
   h += '<div class="card" style="overflow-x:auto"><table class="tbl teamtbl"><thead><tr>' + cols.map(function (c) { return '<th class="sortable' + (ui.teamSort === c[0] ? ' sorted' : '') + (c[0] === 'name' || c[0] === 'openStarters' ? '' : ' r') + '" data-tsort="' + c[0] + '">' + c[1] + '</th>'; }).join('') + '</tr></thead><tbody>' +
     teams.map(function (t) {
       var row = '<tr data-topen="' + t.idx + '" class="' + (t.isMe ? 'me' : '') + '">' +
@@ -415,7 +425,7 @@ function renderMine() {
   h += '<div class="card"><h2>Category direction</h2><div class="puntbtns">' + [['none', 'No punt'], ['ft', 'Punt FT%'], ['to', 'Punt TO'], ['ast', 'Punt AST']].map(function (p) {
     return '<button data-punt="' + p[0] + '" class="' + (state.punt === p[0] ? 'sel' : '') + '">' + p[1] + (advice.puntSuggestion === p[0] && state.punt === 'none' ? ' ★' : '') + '</button>';
   }).join('') + '</div><div class="small" style="margin-top:8px">Decide after your first two significant buys. Punting raises your number on players who fit (e.g. FT% drags for punt FT). Never punt PTS/REB/3PM or both percentages.</div>' +
-    '<div style="margin-top:10px">' + [['ft', 'FT% drags'], ['to', 'High turnovers'], ['ast', 'Low-assist bigs'], ['blk', 'Blocks assets'], ['stl', 'Steals assets'], ['injury', 'Injury risks'], ['bust', 'Panel "overpriced"']].map(function (f) {
+    '<div style="margin-top:10px">' + [['ft', 'FT% drags'], ['to', 'High turnovers'], ['ast', 'Low-assist bigs'], ['blk', 'Blocks assets'], ['stl', 'Steals assets'], ['injury', 'Injury risks'], ['bust', 'Bought "overpriced"']].map(function (f) {
       return '<div class="kv"><span>' + f[1] + '</span><b>' + prof[f[0]] + (prof.names[f[0]] ? ' <span class="dim" style="font-weight:400">' + esc(prof.names[f[0]].join(', ')) + '</span>' : '') + '</b></div>';
     }).join('') + '</div></div>';
   h += '<div class="card"><h2>Price templates (prices paid, sorted)</h2><div class="small">You: <span class="num">' + (paid.map(function (p) { return '$' + p; }).join(' / ') || 'none yet') + '</span></div>' +
